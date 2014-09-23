@@ -21,7 +21,7 @@ public:
 	Vertex();
 };
 
-class Drawable // rename to polygon later
+class Drawable 
 {
 public:
 	std::vector<Vertex> vertices;

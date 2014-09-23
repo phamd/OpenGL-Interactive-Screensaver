@@ -4,6 +4,7 @@
 #include <GL/gl.h>
 #include <GL/glu.h>
 #include <vector>
+#include <math.h>
 #include "main.h"
 #include "containers.h"
 
