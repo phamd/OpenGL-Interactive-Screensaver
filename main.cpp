@@ -12,8 +12,7 @@
 int clickedTimes = 0;
 int gWidth = 600;
 int gHeight = 600;
-int timer = 0;
-int gSpeed = 100;
+unsigned int gSpeed = 100;
 enum Modes {Dot, Line, Poly};
 Modes mouseMode = Dot;
 std::vector<Drawable> drawable;
@@ -49,16 +48,10 @@ void init(void)
 }
 void display(void)
 {
-	int elapsedTime = glutGet(GLUT_ELAPSED_TIME);
-	int deltaTime = elapsedTime - timer;
-	if (deltaTime > gSpeed)
-	{
-		timer = elapsedTime;
-		glClear(GL_COLOR_BUFFER_BIT);
-		drawDrawable();
-		glFlush();
-	}
-		glutPostRedisplay();
+	glClear(GL_COLOR_BUFFER_BIT);
+	drawDrawable();
+	//glFlush();
+	glutSwapBuffers(); // double buffer
 }
 
 Coord pointSlope(float sx, float sy, float fx, float fy)
@@ -74,7 +67,8 @@ Coord pointSlope(float sx, float sy, float fx, float fy)
 void mouse(int btn, int state, int x, int y)
 {
 	switch (btn) {
-	case(GLUT_LEFT_BUTTON):
+	case(GLUT_LEFT_BUTTON) :
+		printf("%d %d \n", x, y);
 		Coord clickedXY = Coord((float)x, (float)y);
 		if ((clickedTimes % 2 == 0) && state == GLUT_UP) { // first click
 			currentVertex.position = clickedXY;
@@ -119,13 +113,13 @@ void keyboard(unsigned char btn, int x, int y)
 		currentVertices = std::vector<Vertex>();
 		clickedTimes = 0;
 		break;
-	case(0x3D) : // = // 0x2B is +
+	case('r') : // = // 0x2B is +
 		printf("%d\n", gSpeed);
-		gSpeed-=20;
+		if (gSpeed > 1) gSpeed-=1;
 		break;
-	case(0x45): // - (on numpad i think)
+	case('f'): // - (on numpad i think)
 		printf("df\n", gSpeed);
-		if (gSpeed > 0) gSpeed+=20;
+		gSpeed+=1;
 		break;
 	case(' ') :
 		drawable.push_back(currentVertices);
@@ -141,27 +135,36 @@ void reshape(int w, int h)
 	gWidth = w;
 	gHeight = h;
 
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	gluOrtho2D(0, w, 0, h);
-
-	glMatrixMode(GL_MODELVIEW);
-	glViewport(0, 0, w, h);
+	//glViewport(0, 0, w, h);
+	//glMatrixMode(GL_PROJECTION);
+	//glLoadIdentity();
+	//printf("reshaped: %d %d; \n", gWidth, gHeight);
+	//glMatrixMode(GL_MODELVIEW);
+	//gluOrtho2D(0, w, 0, h);
 }
 
+
+void timer(int value)
+{
+	glutPostRedisplay();
+	glutTimerFunc(gSpeed, timer, 0);
+}
 
 int main(int argc, char** argv)
 {
 	glutInit(&argc, argv);		  //starts up GLUT
-	glutInitWindowSize(600, 600);
+	glutInitDisplayMode(GLUT_DOUBLE);
+	glutInitWindowSize(800, 800);
 	glutCreateWindow("square");	 //creates the window
-	gluOrtho2D(0, 600, 600, 0);
-	//reshape(600, 600);
-
+	//glutFullScreen();
+	gluOrtho2D(0, glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT), 0);
+	
 	init();
 	glutDisplayFunc(display);	   //registers "display" as the display callback function
+	glutReshapeFunc(reshape);
 	glutMouseFunc(mouse);
 	glutKeyboardFunc(keyboard);
+	glutTimerFunc(gSpeed, timer, 0);
 	glutMainLoop();						 //starts the event loop
 
 	return(0);
