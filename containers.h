@@ -17,19 +17,18 @@ class Vertex
 public:
 	Coord position;
 	Coord direction;
-	float speed;
-	Vertex(Coord);
+	Vertex(Coord, Coord);
 	Vertex();
 };
 
-class Lines // more general version of Vertex, we'll replace it later
+class Drawable // rename to polygon later
 {
 public:
-	std::vector<Coord> vertices;
-	Coord direction;
-	float speed;
-	Lines(Coord);
-	Lines();
+	std::vector<Vertex> vertices;
+	int type; 
+	Drawable(Vertex);
+	Drawable(std::vector<Vertex>);
+	Drawable();
 };
 
 #endif
