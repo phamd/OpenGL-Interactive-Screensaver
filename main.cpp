@@ -5,28 +5,9 @@
 #include <GL/glu.h>
 #include <vector>
 #include "main.h"
+#include "containers.h"
 
-Coord::Coord(float h, float v)
-{
-	x = h;
-	y = v;
-}
-
-Coord::Coord()
-{
-}
-
-Vertex::Vertex(Coord pos)
-{
-	position = pos;
-	direction = Coord(0, 0);
-	speed = 0; 
-}
-
-Vertex::Vertex()
-{
-}
-
+// Globals
 std::vector<Vertex> vertices;
 std::vector<Vertex>::iterator i;
 int clickedTimes = 0;
@@ -35,10 +16,8 @@ int gHeight = 600;
 int timer = 0;
 enum Modes {Dot, Line, Poly};
 Modes mouseMode = Dot;
-
-/* display function - GLUT display callback function
-*			  clears the screen, draws a square, and displays it
-*/
+std::vector<Lines> lines;
+std::vector<Lines>::iterator l;
 
 void drawPoints(void)
 {
@@ -53,15 +32,38 @@ void drawPoints(void)
 		i->position.x += i->direction.x;
 		i->position.y += i->direction.y;
 		glVertex2f((GLfloat)(*i).position.x, (GLfloat)(*i).position.y);
-		printf("%f %f\n", (*i).position.x, (*i).position.y); //debug
+		//printf("%f %f\n", (*i).position.x, (*i).position.y); //debug
 	}
 	glEnd();
 
 }
 
+void drawLines(void)
+{
+	
+	for (l = lines.begin(); l != lines.end(); l++) {
+		glBegin(GL_LINES);
+		std::vector<Coord>::iterator j;
+		for (j = l->vertices.begin(); j != l->vertices.end(); j++) {
+			if (j->x < 0 || j->x > gWidth) { // boundry check on x
+				l->direction.x = -1 * (l->direction.x);
+			}
+			if (j->y < 0 || j->y > gHeight) { // boundry check on y
+				l->direction.y = -1 * (l->direction.y);
+			}
+			j->x += l->direction.x;
+			j->y += l->direction.y;
+			glVertex2f((GLfloat)j->x, (GLfloat)j->y);
+		}
+		glEnd();
+	}
+	
+}
+
 void init(void)
 {
 	glPointSize(3);
+	glLineWidth(3);
 }
 void display(void)
 {
@@ -74,13 +76,19 @@ void display(void)
 		glColor3f(1, 0, 0); // maybe put in init
 
 		drawPoints();
-
+		drawLines();
 		glBegin(GL_POINTS); //debug
 		glVertex2f(-0.5, -0.5);
 		glVertex2f(-0.5, 0.5);
 		glVertex2f(0.5, 0.5);
 		glVertex2f(0.5, -0.5);
 		glEnd();
+
+		glBegin(GL_LINES);	//debug
+		glVertex2f(10, 10);
+		glVertex2f(50, 50);
+		glEnd();
+
 
 		glFlush();
 	}
@@ -101,8 +109,9 @@ void mouse(int btn, int state, int x, int y)
 {
 	switch (btn) {
 	case(GLUT_LEFT_BUTTON):
-		Vertex clickPos(Coord((float)x, (float)y));
+		
 		if (mouseMode == Dot) {
+			Vertex clickPos(Coord((float)x, (float)y));
 			if (clickedTimes == 1 && state == GLUT_UP) { // second click
 				vertices.back().direction = pointSlope(vertices.back().position.x, vertices.back().position.y, x, y);
 				clickedTimes = 0;
@@ -115,16 +124,21 @@ void mouse(int btn, int state, int x, int y)
 			break;
 		}
 		else if (mouseMode == Line) {
+			Coord clickedXY = Coord((float)x, (float)y);
 			if (clickedTimes == 0 && state == GLUT_UP) { // first click
-				vertices.push_back(clickPos);
+				lines.push_back(Lines(clickedXY));
 				glutPostRedisplay();
-				clickedTimes = 1;
+				clickedTimes += 1;
 			}
 			else if (clickedTimes == 1 && state == GLUT_UP) { // second click
-				vertices.back().direction = pointSlope(vertices.back().position.x, vertices.back().position.y, x, y);
+				lines.back().vertices.push_back(clickedXY);
+				glutPostRedisplay();
+				clickedTimes += 1;
+			}
+			else if (clickedTimes == 2 && state == GLUT_UP) { // third click
+				lines.back().direction = pointSlope(lines.back().vertices[0].x, lines.back().vertices[0].y, x, y);
 				clickedTimes = 0;
 			}
-
 			break;
 		}
 	}
@@ -134,7 +148,14 @@ void keyboard(unsigned char btn, int x, int y)
 {
 	switch (btn) {
 	case('q') :
-		printf("q");
+		mouseMode = Dot;
+		break;
+	case('w') :
+		mouseMode = Line;
+		break;
+	case('e') :
+		mouseMode = Poly;
+		break;
 	}
 }
 
@@ -151,7 +172,7 @@ void reshape(int w, int h)
 	glViewport(0, 0, w, h);
 }
 
-/* main function - program entry point */
+
 int main(int argc, char** argv)
 {
 	glutInit(&argc, argv);		  //starts up GLUT
