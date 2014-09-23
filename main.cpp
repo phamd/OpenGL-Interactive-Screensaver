@@ -12,18 +12,19 @@ int clickedTimes = 0;
 int gWidth = 600;
 int gHeight = 600;
 int timer = 0;
+int gSpeed = 100;
 enum Modes {Dot, Line, Poly};
 Modes mouseMode = Dot;
 std::vector<Drawable> drawable;
 std::vector<Drawable>::iterator i;
 std::vector<Vertex> currentVertices;
+std::vector<Vertex>::iterator j;
 Vertex currentVertex;
 
 void drawDrawable(void)
 {
 	for (i = drawable.begin(); i != drawable.end(); i++) {
 		glBegin(i->type);
-		std::vector<Vertex>::iterator j;
 		for (j = i->vertices.begin(); j != i->vertices.end(); j++) {
 			if (j->position.x < 0 || j->position.x > gWidth) { // boundry check on x
 				j->direction.x *= -1;
@@ -49,7 +50,7 @@ void display(void)
 {
 	int elapsedTime = glutGet(GLUT_ELAPSED_TIME);
 	int deltaTime = elapsedTime - timer;
-	if (deltaTime > 100)
+	if (deltaTime > gSpeed)
 	{
 		timer = elapsedTime;
 		glClear(GL_COLOR_BUFFER_BIT);
@@ -74,37 +75,28 @@ void mouse(int btn, int state, int x, int y)
 	switch (btn) {
 	case(GLUT_LEFT_BUTTON):
 		Coord clickedXY = Coord((float)x, (float)y);
-		if (mouseMode == Dot) { // Dot Mode
-			if (clickedTimes == 0 && state == GLUT_UP) { // first click
-				currentVertex.position = clickedXY;
-				glutPostRedisplay();
-				clickedTimes++;
-			} else if (clickedTimes == 1 && state == GLUT_UP) { // second click
-				currentVertex.direction = pointSlope(currentVertex.position.x, currentVertex.position.y, x, y);
-				drawable.push_back(currentVertex);
+		if ((clickedTimes % 2 == 0) && state == GLUT_UP) { // first click
+			currentVertex.position = clickedXY;
+			clickedTimes++;
+		}
+		else if ((clickedTimes % 2 == 1) && state == GLUT_UP) { // second click
+			currentVertex.direction = pointSlope(currentVertex.position.x, currentVertex.position.y, x, y);
+			currentVertices.push_back(currentVertex);
+			clickedTimes++;
+		}
+		if (((clickedTimes == 2 && mouseMode == Dot) || (clickedTimes == 4 && mouseMode == Line)) && state == GLUT_UP) {
+			drawable.push_back(currentVertices);
+			switch (mouseMode){
+			case(Dot):
 				drawable.back().type = GL_POINTS;
-				clickedTimes = 0;
-			}
-			break;
-		}
-		else { // Line and Polygon Mode
-			if ((clickedTimes % 2 == 0) && state == GLUT_UP) { // first click
-				currentVertex.position = clickedXY;
-				clickedTimes++;
-			}
-			else if ((clickedTimes % 2 == 1) && state == GLUT_UP) { // second click
-				currentVertex.direction = pointSlope(currentVertex.position.x, currentVertex.position.y, x, y);
-				currentVertices.push_back(currentVertex);
-				clickedTimes++;
-			}
-			if (clickedTimes == 4 && state == GLUT_UP && mouseMode == Line) { // final click
-				drawable.push_back(currentVertices);
-				currentVertices = std::vector<Vertex>(); // empty it
+				break;
+			case(Line):
 				drawable.back().type = GL_LINES;
-				clickedTimes = 0;
-			} 
-			break;
-		}
+			}
+			currentVertices = std::vector<Vertex>(); // empty it
+			clickedTimes = 0;
+		} 
+		break;
 	}
 }
 
@@ -126,11 +118,20 @@ void keyboard(unsigned char btn, int x, int y)
 		currentVertices = std::vector<Vertex>();
 		clickedTimes = 0;
 		break;
+	case(0x3D) : // = // 0x2B is +
+		printf("%d\n", gSpeed);
+		gSpeed-=20;
+		break;
+	case(0x45): // - (on numpad i think)
+		printf("df\n", gSpeed);
+		if (gSpeed > 0) gSpeed+=20;
+		break;
 	case(' ') :
 		drawable.push_back(currentVertices);
-		currentVertices = std::vector<Vertex>(); // empty it
 		drawable.back().type = GL_POLYGON;
+		currentVertices = std::vector<Vertex>(); // empty it
 		clickedTimes = 0;
+		break;
 	}
 }
 
