@@ -1,18 +1,26 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <GL/glut.h>
+#include <windows.h> //
 #include <GL/gl.h>
 #include <GL/glu.h>
+#include <GL/glut.h>
+//#include <GL/freeglut.h>
 #include <vector>
 #include <math.h>
 #include "main.h"
 #include "containers.h"
 
 // Globals
+GLfloat gSize = 3;
+const GLfloat gSizeStep = 1;
 int clickedTimes = 0;
 int gWidth = 600;
 int gHeight = 600;
-unsigned int gSpeed = 100;
+int gTime = 0;
+float gSpeed = 0.25;
+const float gSpeedStep = 0.001;
+float gSpeedPause = 0.01;
+bool gPaused = false;
 enum Modes {Dot, Line, Poly};
 Modes mouseMode = Dot;
 std::vector<Drawable> drawable;
@@ -21,47 +29,49 @@ std::vector<Vertex> currentVertices;
 std::vector<Vertex>::iterator j;
 Vertex currentVertex;
 
+void updateSizes(void)
+{
+	glPointSize(gSize);
+	glLineWidth(gSize);
+}
+
 void drawDrawable(void)
 {
+	int elapsedTime = glutGet(GLUT_ELAPSED_TIME);
+	int deltaTime = elapsedTime - gTime;
+	gTime = elapsedTime;
+
 	for (i = drawable.begin(); i != drawable.end(); i++) {
 		glBegin(i->type);
 		for (j = i->vertices.begin(); j != i->vertices.end(); j++) {
-			if (j->position.x < 0 || j->position.x > gWidth) { // boundry check on x
-				j->direction.x *= -1;
-			}
-			if (j->position.y < 0 || j->position.y > gHeight) { // boundry check on y
-				j->direction.y *= -1;
-			}
-			j->position.x += j->direction.x;
-			j->position.y += j->direction.y;
+			if (j->position.x < 0) j->direction.x = abs(j->direction.x); // boundry check
+			if (j->position.x > gWidth) j->direction.x = 0 - abs(j->direction.x); // simply flipping the sign wouldn't work
+			if (j->position.y < 0) j->direction.y = abs(j->direction.y);
+			if (j->position.y > gHeight) j->direction.y = 0 - abs(j->direction.y);
+			
+			j->position.x += j->direction.x * deltaTime * gSpeed;
+			j->position.y += j->direction.y * deltaTime * gSpeed;
+			glColor3f(j->color.x, j->color.y, j->color.z);
 			glVertex2f((GLfloat)j->position.x, (GLfloat)j->position.y);
 		}
 		glEnd();
 	}
 }
 
-void init(void)
-{
-	glPointSize(3);
-	glLineWidth(3);
-	glColor3f(1, 0, 0);
-}
-void display(void)
-{
-	glClear(GL_COLOR_BUFFER_BIT);
-	drawDrawable();
-	//glFlush();
-	glutSwapBuffers(); // double buffer
-}
 
-Coord pointSlope(float sx, float sy, float fx, float fy)
+Vector2d pointSlope(float sx, float sy, float fx, float fy)
 {
 	float deltaX = fx - sx;
 	float deltaY = fy - sy;
 	float length = sqrt(deltaX*deltaX + deltaY*deltaY);
-	printf("deltaX: %f; deltaY: %f; length %f; xdiff = %f; ydiff = %f\n ",
-		deltaX, deltaY, length, deltaX / length, deltaY / length); //debug
-	return Coord(deltaX / length, deltaY / length);
+	//printf("deltaX: %f; deltaY: %f; length %f; xdiff = %f; ydiff = %f\n ",
+	//	deltaX, deltaY, length, deltaX / length, deltaY / length); //debug
+	return Vector2d(deltaX / length, deltaY / length);
+}
+
+Vector3d randomColor(void)
+{
+	return Vector3d((float)rand() / float(RAND_MAX), (float)rand() / float(RAND_MAX), (float)rand() / float(RAND_MAX));
 }
 
 void mouse(int btn, int state, int x, int y)
@@ -69,13 +79,14 @@ void mouse(int btn, int state, int x, int y)
 	switch (btn) {
 	case(GLUT_LEFT_BUTTON) :
 		printf("%d %d \n", x, y);
-		Coord clickedXY = Coord((float)x, (float)y);
+		Vector2d clickedXY = Vector2d((float)x, (float)y);
 		if ((clickedTimes % 2 == 0) && state == GLUT_UP) { // first click
 			currentVertex.position = clickedXY;
 			clickedTimes++;
 		}
 		else if ((clickedTimes % 2 == 1) && state == GLUT_UP) { // second click
 			currentVertex.direction = pointSlope(currentVertex.position.x, currentVertex.position.y, x, y);
+			currentVertex.color = randomColor(); //color
 			currentVertices.push_back(currentVertex);
 			clickedTimes++;
 		}
@@ -98,30 +109,52 @@ void mouse(int btn, int state, int x, int y)
 void keyboard(unsigned char btn, int x, int y)
 {
 	switch (btn) {
-	case('q') :
+	case('1') : // Dot Mode
 		mouseMode = Dot;
 		currentVertices = std::vector<Vertex>(); // empty the in progress vertices
 		clickedTimes = 0;
 		break;
-	case('w') :
+	case('2') : // Line Mode
 		mouseMode = Line;
 		currentVertices = std::vector<Vertex>();
 		clickedTimes = 0;
 		break;
-	case('e') :
+	case('3') : // Polygon Mode
 		mouseMode = Poly;
 		currentVertices = std::vector<Vertex>();
 		clickedTimes = 0;
 		break;
-	case('r') : // = // 0x2B is +
-		printf("%d\n", gSpeed);
-		if (gSpeed > 1) gSpeed-=1;
+	case('-') : // Speed Down
+		gSpeed = (gSpeed - gSpeedStep < 0) ? 0 : gSpeed - gSpeedStep; // no negative speeds
+		printf("- pressed\n"); //debug
 		break;
-	case('f'): // - (on numpad i think)
-		printf("df\n", gSpeed);
-		gSpeed+=1;
+	case('+') : // Speed Up
+		gSpeed += gSpeedStep;
+		printf("+ pressed\n"); //debug
 		break;
-	case(' ') :
+	case('I') : // DELETE THIS
+		gSpeed = (gSpeed - gSpeedStep < 0) ? 0 : gSpeed - 2; // no negative speeds
+		break;
+	case('O') : // DELETE THIS
+		gSpeed = (gSpeed < 0) ? 0 : gSpeed + 2;
+		break;
+	case('r') : // Reset
+		drawable.clear();
+		break;
+	case('p') : // Pause
+		gSpeedPause = gPaused ? gSpeedPause : gSpeed;
+		gSpeed = gPaused ? gSpeedPause : 0;
+		gPaused = !gPaused;
+		break;
+	case('t') : // Size Down
+		gSize = (gSize - gSizeStep < 1) ? 1 : gSize - gSizeStep;
+		updateSizes();
+		break;
+	case('g') : // Size Up
+		gSize += gSizeStep;
+		updateSizes();
+		break;
+	case(' ') : // Finish Polygon
 		drawable.push_back(currentVertices);
 		drawable.back().type = GL_POLYGON;
 		currentVertices = std::vector<Vertex>(); // empty it
@@ -143,19 +176,34 @@ void reshape(int w, int h)
 	//gluOrtho2D(0, w, 0, h);
 }
 
-
 void timer(int value)
 {
 	glutPostRedisplay();
-	glutTimerFunc(gSpeed, timer, 0);
+	glutTimerFunc(16, timer, 0);
+}
+
+void init(void)
+{
+	updateSizes();
+	glColor3f(1, 0, 0);
+}
+
+void display(void)
+{
+	glClear(GL_COLOR_BUFFER_BIT);
+	drawDrawable();
+	//glFlush();
+	glutSwapBuffers(); // double buffer
 }
 
 int main(int argc, char** argv)
 {
 	glutInit(&argc, argv);		  //starts up GLUT
-	glutInitDisplayMode(GLUT_DOUBLE);
+	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
 	glutInitWindowSize(800, 800);
+
 	glutCreateWindow("square");	 //creates the window
+
 	//glutFullScreen();
 	gluOrtho2D(0, glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT), 0);
 	
@@ -164,7 +212,7 @@ int main(int argc, char** argv)
 	glutReshapeFunc(reshape);
 	glutMouseFunc(mouse);
 	glutKeyboardFunc(keyboard);
-	glutTimerFunc(gSpeed, timer, 0);
+	glutTimerFunc(16, timer, 0);
 	glutMainLoop();						 //starts the event loop
 
 	return(0);

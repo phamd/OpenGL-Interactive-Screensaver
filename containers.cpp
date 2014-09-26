@@ -1,27 +1,30 @@
 #include "containers.h"
 #include <vector>
 
-Coord::Coord(float h, float v)
+Vector2d::Vector2d(float h, float v)
 {
 	x = h;
 	y = v;
 }
 
-Coord::Coord()
-{
+Vector2d::Vector2d() {}
 
+Vector3d::Vector3d(float r, float g, float b)
+{
+	x = r;
+	y = g;
+	z = b;
 }
 
-Vertex::Vertex(Coord pos, Coord dir) // insert first element
+Vector3d::Vector3d() {}
+
+Vertex::Vertex(Vector2d pos, Vector2d dir) // insert first element
 {
 	position = pos;
 	direction = dir;
 }
 
-Vertex::Vertex()
-{
-
-}
+Vertex::Vertex() {}
 
 Drawable::Drawable(Vertex pos) // insert first element
 {
@@ -33,7 +36,4 @@ Drawable::Drawable(std::vector<Vertex> verti) // insert first element
 	vertices = verti;
 }
 
-Drawable::Drawable()
-{
-
-}
+Drawable::Drawable() {}

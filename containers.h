@@ -3,21 +3,32 @@
 
 #include <vector>
 
-class Coord
+class Vector2d
 {
 public:
 	float x;
 	float y;
-	Coord(float, float);
-	Coord();
+	Vector2d(float, float);
+	Vector2d();
+};
+
+class Vector3d
+{
+public:
+	float x;
+	float y;
+	float z;
+	Vector3d(float, float, float);
+	Vector3d();
 };
 
 class Vertex
 {
 public:
-	Coord position;
-	Coord direction;
-	Vertex(Coord, Coord);
+	Vector2d position;
+	Vector2d direction;
+	Vector3d color;
+	Vertex(Vector2d, Vector2d);
 	Vertex();
 };
 
