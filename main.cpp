@@ -111,32 +111,42 @@ void clearCurrent(void)
 
 void drawHelpWindow(void)
 {
-	glColor3f(1.0f, 1.0f, 1.0f);
-
+	// Set up things to write
 	std::string line;
 	std::ifstream helpfile("help.txt");
-
-	float startX = gWidth / 4; // position of the first line
-	float startY = gHeight / 4;
-
+	std::vector<std::string> linesToDisplay;
+	
 	if (helpfile.is_open())	{
-		while (getline(helpfile, line))
-		{
-			glRasterPos2f(startX, startY);
-			const char *tmp = line.c_str();
-			for (size_t i = 0; i < strlen(tmp); ++i) {
-				glutBitmapCharacter(GLUT_BITMAP_9_BY_15, tmp[i]);
-			}
-			startY += 20;
+		while (getline(helpfile, line)) {
+			linesToDisplay.push_back(line);
 		}
 	}
 	else {
-		std::cout << "help.txt missing!";
+		linesToDisplay.push_back("help.txt missing!");
 	}
 	helpfile.close();
+
+	linesToDisplay.push_back("Mouse Mode: " + std::to_string(mouseMode));
+	linesToDisplay.push_back("Number of Shapes: " + std::to_string(drawable.size()));
+	linesToDisplay.push_back("Current Speed: " + std::to_string(gSpeed));
+	linesToDisplay.push_back("Click count: " + std::to_string(clickedTimes));
+
+
+	// Begin writing lines to the screen
+	float startX = gWidth / 4; // position of the first line
+	float startY = gHeight / 4;
+	glColor3f(1.0f, 1.0f, 1.0f);
+	for (std::vector<std::string>::iterator li = linesToDisplay.begin(); li != linesToDisplay.end(); li++) {
+		glRasterPos2f(startX, startY);
+		const char *tmp = li->c_str();
+		for (size_t i = 0; i < strlen(tmp); ++i) {
+			glutBitmapCharacter(GLUT_BITMAP_9_BY_15, tmp[i]);
+		}
+		startY += 20;
+	}
+
 	/*
 	glRasterPos2f(startX, startY);
-	std::string tmp2 = "Current Speed: " + std::to_string(gSpeed);
 	const char *tmp = tmp2.c_str();
 	for (size_t i = 0; i < strlen(tmp); ++i) {
 		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, tmp[i]);
@@ -146,11 +156,12 @@ void drawHelpWindow(void)
 
 void mouse(int btn, int state, int x, int y)
 {
+	printf("Pressed %d, %d\n", btn, state);
 	switch (btn) {
 	case(GLUT_LEFT_BUTTON) :
 		printf("%d %d \n", x, y);
 		Vector2d clickedXY = Vector2d((float)x, (float)y);
-		if ((clickedTimes % 2 == 0) && state == GLUT_UP) { // first click
+		if ((clickedTimes == 0 || clickedTimes % 2 == 0) && state == GLUT_UP) { // first click
 			currentVertex.position = clickedXY;
 			clickedTimes++;
 		}
@@ -225,10 +236,12 @@ void keyboard(unsigned char btn, int x, int y)
 		updateSizes();
 		break;
 	case(' ') : // Finish Polygon
-		drawable.push_back(currentVertices);
-		drawable.back().type = GL_POLYGON;
-		currentVertices = std::vector<Vertex>(); // empty it
-		clickedTimes = 0;
+		if (currentVertices.size() >= 3) {
+			drawable.push_back(currentVertices);
+			drawable.back().type = GL_POLYGON;
+			currentVertices = std::vector<Vertex>(); // empty it
+			clickedTimes = 0;
+		}
 		break;
 	case('h') : // Show Help
 		gHelpMenu = !gHelpMenu;
@@ -261,6 +274,14 @@ void reshape(int w, int h)
 	gluOrtho2D(0, glutGet(GLUT_WINDOW_WIDTH) - 1, glutGet(GLUT_WINDOW_HEIGHT) - 1, 0);
 	glMatrixMode(GL_MODELVIEW);
 	//glLoadIdentity();
+}
+
+void menu(int label) {
+
+	switch (label) {
+	case 'q':
+		exit(0);
+	}
 }
 
 void timer(int value)
@@ -329,9 +350,13 @@ int main(int argc, char** argv)
 	init();
 	glutDisplayFunc(display);
 	glutReshapeFunc(reshape);
-	glutMouseFunc(mouse);
 	glutKeyboardFunc(keyboard);
+	glutMouseFunc(mouse);
 	glutTimerFunc(16, timer, 0);
+
+	glutCreateMenu(menu);
+	glutAddMenuEntry("Quit", 'q');
+	glutAttachMenu(GLUT_RIGHT_BUTTON);
 
 	glutMainLoop();
 	return(0);

@@ -38,5 +38,6 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="Makefile" />
+    <Text Include="help.txt" />
   </ItemGroup>
 </Project>
