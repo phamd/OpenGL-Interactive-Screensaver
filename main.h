@@ -1,8 +1,8 @@
 #include "containers.h"
 
-Vector2d pointSlope(float sx, float sy, float fx, float fy);
-Vector3d randomColor(void);
+void randomizeScene(void);
 void drawDrawable(void);
+void clearCurrent(void);
 void updateSizes(void);
 void display(void);
 void mouse(int, int, int, int);

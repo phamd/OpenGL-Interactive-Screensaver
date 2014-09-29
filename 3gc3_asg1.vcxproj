@@ -79,10 +79,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="calculations.cpp" />
     <ClCompile Include="containers.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="calculations.h" />
     <ClInclude Include="containers.h" />
     <ClInclude Include="main.h" />
   </ItemGroup>

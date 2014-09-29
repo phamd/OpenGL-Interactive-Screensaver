@@ -1,0 +1,15 @@
+  Key    | Function
+------------------------
+   h     | Show/Hide Help Menu
+   1     | Dot Mode 
+   2     | Line Mode 
+   3     | Polygon Mode 
+ <space> | Finish polygon 
+   +     | Increase speed 
+   -     | Decrease speed 
+   y     | Increase vertex size 
+   h     | Decrease vertex size 
+   r     | Reset scene 
+   a     | Randomize scene 
+   f     | Toggle fullscreen
+   q     | Quit program

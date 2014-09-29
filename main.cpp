@@ -1,14 +1,18 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
+#include <iostream>
+#include <fstream>
 #include <windows.h> //
 #include <GL/gl.h>
 #include <GL/glu.h>
 #include <GL/glut.h>
-//#include <GL/freeglut.h>
+#include <GL/freeglut.h>
 #include <vector>
 #include <math.h>
 #include "main.h"
 #include "containers.h"
+#include "calculations.h"
 
 // Globals
 GLfloat gSize = 3;
@@ -18,9 +22,11 @@ int gWidth = 600;
 int gHeight = 600;
 int gTime = 0;
 float gSpeed = 0.25;
-const float gSpeedStep = 0.001;
+const float gSpeedStep = 0.05;
 float gSpeedPause = 0.01;
 bool gPaused = false;
+bool gfullscreen = true;
+bool gHelpMenu = true;
 enum Modes {Dot, Line, Poly};
 Modes mouseMode = Dot;
 std::vector<Drawable> drawable;
@@ -59,20 +65,84 @@ void drawDrawable(void)
 }
 
 
-Vector2d pointSlope(float sx, float sy, float fx, float fy)
-{
-	float deltaX = fx - sx;
-	float deltaY = fy - sy;
-	float length = sqrt(deltaX*deltaX + deltaY*deltaY);
-	//printf("deltaX: %f; deltaY: %f; length %f; xdiff = %f; ydiff = %f\n ",
-	//	deltaX, deltaY, length, deltaX / length, deltaY / length); //debug
-	return Vector2d(deltaX / length, deltaY / length);
+void makeVertex(void) {
+	currentVertex.position = Vector2d(randFloat(0, gWidth), randFloat(0, gHeight));
+	currentVertex.direction = Vector2d(randFloat(-1, 1), randFloat(-1, 1));
+	currentVertex.color = randomColor();
+	currentVertices.push_back(currentVertex);
 }
 
-Vector3d randomColor(void)
+void randomizeScene(void)
 {
-	return Vector3d((float)rand() / float(RAND_MAX), (float)rand() / float(RAND_MAX), (float)rand() / float(RAND_MAX));
+	for (int i = 0; i < (int) randFloat(50,100); i++) { // 50 to 100 objects
+		
+		float decideShape = randFloat(0, 1);
+			
+		if (decideShape < 0.7) { // 70% point
+			makeVertex();
+			drawable.push_back(currentVertices);
+			drawable.back().type = GL_POINTS;
+			clearCurrent();
+		}
+		else if (decideShape > 0.95) { // 5% polygon
+			for (int i = 0; i < (int)randFloat(3, 7); i++) { // 3 to 7 vertices in a polygon
+				makeVertex();
+			}
+			drawable.push_back(currentVertices);
+			drawable.back().type = GL_POLYGON;
+			clearCurrent();
+		}
+		else { // 25% line
+			makeVertex();
+			makeVertex();
+			drawable.push_back(currentVertices);
+			drawable.back().type = GL_LINES;
+			clearCurrent();
+		}
+	}
 }
+
+void clearCurrent(void)
+{
+	currentVertices = std::vector<Vertex>(); // empty the in progress vertices
+	currentVertex = Vertex();
+	clickedTimes = 0;
+}
+
+void drawHelpWindow(void)
+{
+	glColor3f(1.0f, 1.0f, 1.0f);
+
+	std::string line;
+	std::ifstream helpfile("help.txt");
+
+	float startX = gWidth / 4; // position of the first line
+	float startY = gHeight / 4;
+
+	if (helpfile.is_open())	{
+		while (getline(helpfile, line))
+		{
+			glRasterPos2f(startX, startY);
+			const char *tmp = line.c_str();
+			for (size_t i = 0; i < strlen(tmp); ++i) {
+				glutBitmapCharacter(GLUT_BITMAP_9_BY_15, tmp[i]);
+			}
+			startY += 20;
+		}
+	}
+	else {
+		std::cout << "help.txt missing!";
+	}
+	helpfile.close();
+	/*
+	glRasterPos2f(startX, startY);
+	std::string tmp2 = "Current Speed: " + std::to_string(gSpeed);
+	const char *tmp = tmp2.c_str();
+	for (size_t i = 0; i < strlen(tmp); ++i) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, tmp[i]);
+	} */
+}
+
 
 void mouse(int btn, int state, int x, int y)
 {
@@ -93,14 +163,14 @@ void mouse(int btn, int state, int x, int y)
 		if (((clickedTimes == 2 && mouseMode == Dot) || (clickedTimes == 4 && mouseMode == Line)) && state == GLUT_UP) {
 			drawable.push_back(currentVertices);
 			switch (mouseMode){
-			case(Dot):
+			case(Dot) :
 				drawable.back().type = GL_POINTS;
 				break;
-			case(Line):
+			case(Line) :
 				drawable.back().type = GL_LINES;
+				break;
 			}
-			currentVertices = std::vector<Vertex>(); // empty it
-			clickedTimes = 0;
+			clearCurrent();
 		} 
 		break;
 	}
@@ -111,18 +181,15 @@ void keyboard(unsigned char btn, int x, int y)
 	switch (btn) {
 	case('1') : // Dot Mode
 		mouseMode = Dot;
-		currentVertices = std::vector<Vertex>(); // empty the in progress vertices
-		clickedTimes = 0;
+		clearCurrent();
 		break;
 	case('2') : // Line Mode
 		mouseMode = Line;
-		currentVertices = std::vector<Vertex>();
-		clickedTimes = 0;
+		clearCurrent(); 
 		break;
 	case('3') : // Polygon Mode
 		mouseMode = Poly;
-		currentVertices = std::vector<Vertex>();
-		clickedTimes = 0;
+		clearCurrent(); 
 		break;
 	case('-') : // Speed Down
 		gSpeed = (gSpeed - gSpeedStep < 0) ? 0 : gSpeed - gSpeedStep; // no negative speeds
@@ -138,6 +205,9 @@ void keyboard(unsigned char btn, int x, int y)
 	case('O') : // DELETE THIS
 		gSpeed = (gSpeed < 0) ? 0 : gSpeed + 2;
 		break;
+	case('a') :
+		randomizeScene();
+		break;
 	case('r') : // Reset
 		drawable.clear();
 		break;
@@ -146,11 +216,11 @@ void keyboard(unsigned char btn, int x, int y)
 		gSpeed = gPaused ? gSpeedPause : 0;
 		gPaused = !gPaused;
 		break;
-	case('t') : // Size Down
+	case('g') : // Size Down
 		gSize = (gSize - gSizeStep < 1) ? 1 : gSize - gSizeStep;
 		updateSizes();
 		break;
-	case('g') : // Size Up
+	case('t') : // Size Up
 		gSize += gSizeStep;
 		updateSizes();
 		break;
@@ -160,6 +230,23 @@ void keyboard(unsigned char btn, int x, int y)
 		currentVertices = std::vector<Vertex>(); // empty it
 		clickedTimes = 0;
 		break;
+	case('h') : // Show Help
+		gHelpMenu = !gHelpMenu;
+		break;
+	case('q') : // Exit
+		exit(0);
+		break;
+	case('f') :
+		if (gfullscreen) {
+			glutPositionWindow(0, 0);
+			glutReshapeWindow(600, 600);
+			gfullscreen = false;
+		}
+		else {
+			glutFullScreen();
+			gfullscreen = true;
+		}
+		break;
 	}
 }
 
@@ -168,12 +255,12 @@ void reshape(int w, int h)
 	gWidth = w;
 	gHeight = h;
 
-	//glViewport(0, 0, w, h);
-	//glMatrixMode(GL_PROJECTION);
+	glViewport(0, 0, w, h);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	gluOrtho2D(0, glutGet(GLUT_WINDOW_WIDTH) - 1, glutGet(GLUT_WINDOW_HEIGHT) - 1, 0);
+	glMatrixMode(GL_MODELVIEW);
 	//glLoadIdentity();
-	//printf("reshaped: %d %d; \n", gWidth, gHeight);
-	//glMatrixMode(GL_MODELVIEW);
-	//gluOrtho2D(0, w, 0, h);
 }
 
 void timer(int value)
@@ -185,36 +272,68 @@ void timer(int value)
 void init(void)
 {
 	updateSizes();
-	glColor3f(1, 0, 0);
+	glColor3f(1, 1, 1);
 }
 
 void display(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT);
 	drawDrawable();
+	if (gHelpMenu) drawHelpWindow();
 	//glFlush();
 	glutSwapBuffers(); // double buffer
 }
 
 int main(int argc, char** argv)
 {
+	std::string line;
+	std::ifstream helpfile("help.txt");
+	if (helpfile.is_open())	{
+		while (getline(helpfile, line))
+		{
+			std::cout << line << "\n";
+		}
+	}
+	else {
+		std::cout << "help.txt missing!";
+	}
+	helpfile.close();
+
+
+	/*
+	printf("List of commands:\n");
+	printf("%8s %25s\n", "Key", "Function");
+	printf("-------------------------------------\n");
+	printf("%8s %25s\n", "1", "Dot Mode");
+	printf("%8s %25s\n", "2", "Line Mode");
+	printf("%8s %25s\n", "3", "Polygon Mode");
+	printf("%8s %25s\n", "<space>", "Finish Polygon");
+	printf("%8s %25s\n", "+", "Increase speed");
+	printf("%8s %25s\n", "-", "Decrease speed");
+	printf("%8s %25s\n", "y", "Increase vertex size");
+	printf("%8s %25s\n", "h", "Decrease vertex size");
+	printf("%8s %25s\n", "r", "Reset scene");
+	printf("%8s %25s\n", "a", "Randomize scene");
+	printf("%8s %25s\n", "f", "Toggle fullscreen");
+	*/
+	system("PAUSE");
+
 	glutInit(&argc, argv);		  //starts up GLUT
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
-	glutInitWindowSize(800, 800);
+	//glutInitWindowSize(600, 600);
+	glutCreateWindow("Screensaver");	 //creates the window
 
-	glutCreateWindow("square");	 //creates the window
-
-	//glutFullScreen();
-	gluOrtho2D(0, glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT), 0);
+	glutFullScreen();
+	//gluOrtho2D(0, glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT), 0);
 	
 	init();
-	glutDisplayFunc(display);	   //registers "display" as the display callback function
+	glutDisplayFunc(display);
 	glutReshapeFunc(reshape);
 	glutMouseFunc(mouse);
 	glutKeyboardFunc(keyboard);
 	glutTimerFunc(16, timer, 0);
-	glutMainLoop();						 //starts the event loop
 
+	glutMainLoop();
 	return(0);
 }
 
