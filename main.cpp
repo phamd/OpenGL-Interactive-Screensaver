@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
+#include <cstring>
 #include <iostream>
 #include <fstream>
-#include <windows.h> //
 #include <GL/gl.h>
 #include <GL/glu.h>
 #include <GL/glut.h>
@@ -13,6 +13,11 @@
 #include "main.h"
 #include "containers.h"
 #include "calculations.h"
+
+#ifdef WIN32
+#include <windows.h>
+#endif
+
 
 // Globals
 GLfloat gSize = 3;
@@ -139,7 +144,7 @@ void drawHelpWindow(void)
 	for (std::vector<std::string>::iterator li = linesToDisplay.begin(); li != linesToDisplay.end(); li++) {
 		glRasterPos2f(startX, startY);
 		const char *tmp = li->c_str();
-		for (size_t i = 0; i < strlen(tmp); ++i) {
+		for (size_t i = 0; i < std::strlen(tmp); ++i) {
 			glutBitmapCharacter(GLUT_BITMAP_9_BY_15, tmp[i]);
 		}
 		startY += 20;
@@ -337,7 +342,7 @@ int main(int argc, char** argv)
 	printf("%8s %25s\n", "a", "Randomize scene");
 	printf("%8s %25s\n", "f", "Toggle fullscreen");
 	*/
-	system("PAUSE");
+	//system("PAUSE");
 
 	glutInit(&argc, argv);		  //starts up GLUT
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);

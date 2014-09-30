@@ -2,6 +2,7 @@
 
 void randomizeScene(void);
 void drawDrawable(void);
+void drawHelpWindow(void);
 void clearCurrent(void);
 void updateSizes(void);
 void display(void);
