@@ -18,22 +18,23 @@
 #include <windows.h>
 #endif
 
-
-// Globals
-GLfloat gSize = 3;
-const GLfloat gSizeStep = 1;
+// Constants
+const float gSizeStep = 1;
+const float gSpeedStep = 0.05;
+enum Modes {Dot, Line, Poly};
+// States
+Modes mouseMode = Dot;
+bool gPaused = false;
+bool gfullscreen = true;
+bool gHelpMenu = true;
+float gSize = 3;
+float gSpeed = 0.25;
+float gSpeedPause = 0.01; // Speed to return to after pausing
 int clickedTimes = 0;
 int gWidth = 600;
 int gHeight = 600;
 int gTime = 0;
-float gSpeed = 0.25;
-const float gSpeedStep = 0.05;
-float gSpeedPause = 0.01;
-bool gPaused = false;
-bool gfullscreen = true;
-bool gHelpMenu = true;
-enum Modes {Dot, Line, Poly};
-Modes mouseMode = Dot;
+// Containers
 std::vector<Drawable> drawable;
 std::vector<Drawable>::iterator i;
 std::vector<Vertex> currentVertices;
@@ -114,6 +115,14 @@ void clearCurrent(void)
 	clickedTimes = 0;
 }
 
+void drawSentence(const char* line, float startX, float startY)
+{
+	glColor3f(1.0f, 1.0f, 1.0f);
+	for (size_t i = 0; i < std::strlen(tmp); ++i) {
+		glutBitmapCharacter(GLUT_BITMAP_9_BY_15, tmp[i]);
+	}
+}
+
 void drawHelpWindow(void)
 {
 	// Set up things to write
@@ -140,13 +149,10 @@ void drawHelpWindow(void)
 	// Begin writing lines to the screen
 	float startX = gWidth / 4; // position of the first line
 	float startY = gHeight / 4;
-	glColor3f(1.0f, 1.0f, 1.0f);
 	for (std::vector<std::string>::iterator li = linesToDisplay.begin(); li != linesToDisplay.end(); li++) {
 		glRasterPos2f(startX, startY);
 		const char *tmp = li->c_str();
-		for (size_t i = 0; i < std::strlen(tmp); ++i) {
-			glutBitmapCharacter(GLUT_BITMAP_9_BY_15, tmp[i]);
-		}
+		drawSentence(tmp, startX, startY);
 		startY += 20;
 	}
 
@@ -184,6 +190,8 @@ void mouse(int btn, int state, int x, int y)
 				break;
 			case(Line) :
 				drawable.back().type = GL_LINES;
+				break;
+			case(Poly) :
 				break;
 			}
 			clearCurrent();
