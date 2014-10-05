@@ -1,22 +1,21 @@
+#ifdef WIN32
+#include <windows.h>
+#include <GL/freeglut.h>
+#endif
+#include <GL/gl.h>
+#include <GL/glu.h>
+#include <GL/glut.h>
+#include <vector>
+#include <math.h>
+#include "containers.h"
+#include "calculations.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h> // for random seed
 #include <string>
 #include <cstring>
 #include <iostream>
 #include <fstream>
-#include <GL/gl.h>
-#include <GL/glu.h>
-#include <GL/glut.h>
-#include <GL/freeglut.h>
-#include <vector>
-#include <math.h>
-#include "main.h"
-#include "containers.h"
-#include "calculations.h"
-
-#ifdef WIN32
-#include <windows.h>
-#endif
 
 // Constants
 const float gSizeStep = 1;
@@ -27,19 +26,22 @@ Modes mouseMode = Dot;
 bool gPaused = false;
 bool gfullscreen = true;
 bool gHelpMenu = true;
+bool gDragMode = false; // Drag to set direction instead of clicking
 float gSize = 3;
-float gSpeed = 0.25;
+float gSpeed = 0.205;
 float gSpeedPause = 0.01; // Speed to return to after pausing
 int clickedTimes = 0;
 int gWidth = 600;
 int gHeight = 600;
 int gTime = 0;
+Vector2d gMousePos;
 // Containers
 std::vector<Drawable> drawable;
 std::vector<Drawable>::iterator i;
 std::vector<Vertex> currentVertices;
 std::vector<Vertex>::iterator j;
 Vertex currentVertex;
+std::vector<std::string> helpText;
 
 void updateSizes(void)
 {
@@ -70,12 +72,18 @@ void drawDrawable(void)
 	}
 }
 
-
 void makeVertex(void) {
 	currentVertex.position = Vector2d(randFloat(0, gWidth), randFloat(0, gHeight));
 	currentVertex.direction = Vector2d(randFloat(-1, 1), randFloat(-1, 1));
 	currentVertex.color = randomColor();
 	currentVertices.push_back(currentVertex);
+}
+
+void clearCurrent(void)
+{
+	currentVertices = std::vector<Vertex>(); // empty the in progress vertices
+	currentVertex = Vertex();
+	clickedTimes = 0;
 }
 
 void randomizeScene(void)
@@ -108,60 +116,38 @@ void randomizeScene(void)
 	}
 }
 
-void clearCurrent(void)
-{
-	currentVertices = std::vector<Vertex>(); // empty the in progress vertices
-	currentVertex = Vertex();
-	clickedTimes = 0;
-}
-
 void drawSentence(const char* line, float startX, float startY)
 {
 	glColor3f(1.0f, 1.0f, 1.0f);
-	for (size_t i = 0; i < std::strlen(tmp); ++i) {
-		glutBitmapCharacter(GLUT_BITMAP_9_BY_15, tmp[i]);
+	for (size_t i = 0; i < std::strlen(line); ++i) {
+		glutBitmapCharacter(GLUT_BITMAP_9_BY_15, line[i]);
 	}
 }
 
-void drawHelpWindow(void)
+void drawDebugText(void)
 {
-	// Set up things to write
-	std::string line;
-	std::ifstream helpfile("help.txt");
-	std::vector<std::string> linesToDisplay;
-	
-	if (helpfile.is_open())	{
-		while (getline(helpfile, line)) {
-			linesToDisplay.push_back(line);
-		}
+	std::string debugText[5];
+	debugText[0] = "Mouse Mode: " + std::to_string(mouseMode);
+	debugText[1] = "Click count: " + std::to_string(clickedTimes);
+	debugText[2] = "Number of Shapes: " + std::to_string(drawable.size());
+	debugText[3] = "Speed: " + std::to_string(gSpeed);
+	debugText[4] = "Size: " + std::to_string(gSize);
+
+	for (int i = 0, Y = 20; i < 5; i++, Y += 20) {
+		glRasterPos2f(10, Y);
+		drawSentence(debugText[i].c_str(), 10, Y);
 	}
-	else {
-		linesToDisplay.push_back("help.txt missing!");
-	}
-	helpfile.close();
+}
 
-	linesToDisplay.push_back("Mouse Mode: " + std::to_string(mouseMode));
-	linesToDisplay.push_back("Number of Shapes: " + std::to_string(drawable.size()));
-	linesToDisplay.push_back("Current Speed: " + std::to_string(gSpeed));
-	linesToDisplay.push_back("Click count: " + std::to_string(clickedTimes));
-
-
-	// Begin writing lines to the screen
-	float startX = gWidth / 4; // position of the first line
-	float startY = gHeight / 4;
-	for (std::vector<std::string>::iterator li = linesToDisplay.begin(); li != linesToDisplay.end(); li++) {
+void drawHelpText(float startX, float startY)
+{
+	for (std::vector<std::string>::iterator li = helpText.begin(); li != helpText.end(); li++) {
 		glRasterPos2f(startX, startY);
 		const char *tmp = li->c_str();
 		drawSentence(tmp, startX, startY);
 		startY += 20;
 	}
-
-	/*
-	glRasterPos2f(startX, startY);
-	const char *tmp = tmp2.c_str();
-	for (size_t i = 0; i < strlen(tmp); ++i) {
-		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, tmp[i]);
-	} */
+	drawDebugText();
 }
 
 
@@ -172,13 +158,13 @@ void mouse(int btn, int state, int x, int y)
 	case(GLUT_LEFT_BUTTON) :
 		printf("%d %d \n", x, y);
 		Vector2d clickedXY = Vector2d((float)x, (float)y);
-		if ((clickedTimes == 0 || clickedTimes % 2 == 0) && state == GLUT_UP) { // first click
+		if ((clickedTimes == 0 || clickedTimes % 2 == 0) && state == (gDragMode ? GLUT_DOWN : GLUT_UP)) { // first click
 			currentVertex.position = clickedXY;
+			currentVertex.color = randomColor(); //color
 			clickedTimes++;
 		}
 		else if ((clickedTimes % 2 == 1) && state == GLUT_UP) { // second click
 			currentVertex.direction = pointSlope(currentVertex.position.x, currentVertex.position.y, x, y);
-			currentVertex.color = randomColor(); //color
 			currentVertices.push_back(currentVertex);
 			clickedTimes++;
 		}
@@ -200,9 +186,42 @@ void mouse(int btn, int state, int x, int y)
 	}
 }
 
+void mousePassive(int x, int y)
+{
+	gMousePos.x = x;
+	gMousePos.y = y;
+}
+
+void drawDirectionArrow()
+{
+	int X = gMousePos.x;
+	int Y = gMousePos.y;
+	Vector2d arrowheadPos = pointSlope(gMousePos, currentVertex.position);
+	float k = (-(X - arrowheadPos.x)) / ((X - arrowheadPos.x)*(X - arrowheadPos.x)); // What am I even doing here?
+	Vector2d thirdPoint = Vector2d(arrowheadPos.x - k, arrowheadPos.x + k);
+
+	if (clickedTimes % 2 == 1) {
+		glBegin(GL_LINES); // Arrow line
+			glColor3f(currentVertex.color.x, currentVertex.color.y, currentVertex.color.z);
+			glVertex2f((GLfloat)currentVertex.position.x, (GLfloat)currentVertex.position.y);
+			glVertex2f(X, Y);
+		glEnd();
+		glBegin(GL_POLYGON); // Arrow head
+			glVertex2f(X, Y);
+			glVertex2f(X - 20 * thirdPoint.x, Y - 20 * thirdPoint.y);
+			glVertex2f(X-40*arrowheadPos.x, Y-40*arrowheadPos.y);
+			glVertex2f(X+20*thirdPoint.x, Y+20*thirdPoint.y);
+		glEnd();
+
+	}
+}
+
 void keyboard(unsigned char btn, int x, int y)
 {
 	switch (btn) {
+	case('h') : // Show Help
+		gHelpMenu = !gHelpMenu;
+		break;
 	case('1') : // Dot Mode
 		mouseMode = Dot;
 		clearCurrent();
@@ -215,39 +234,6 @@ void keyboard(unsigned char btn, int x, int y)
 		mouseMode = Poly;
 		clearCurrent(); 
 		break;
-	case('-') : // Speed Down
-		gSpeed = (gSpeed - gSpeedStep < 0) ? 0 : gSpeed - gSpeedStep; // no negative speeds
-		printf("- pressed\n"); //debug
-		break;
-	case('+') : // Speed Up
-		gSpeed += gSpeedStep;
-		printf("+ pressed\n"); //debug
-		break;
-	case('I') : // DELETE THIS
-		gSpeed = (gSpeed - gSpeedStep < 0) ? 0 : gSpeed - 2; // no negative speeds
-		break;
-	case('O') : // DELETE THIS
-		gSpeed = (gSpeed < 0) ? 0 : gSpeed + 2;
-		break;
-	case('a') :
-		randomizeScene();
-		break;
-	case('r') : // Reset
-		drawable.clear();
-		break;
-	case('p') : // Pause
-		gSpeedPause = gPaused ? gSpeedPause : gSpeed;
-		gSpeed = gPaused ? gSpeedPause : 0;
-		gPaused = !gPaused;
-		break;
-	case('g') : // Size Down
-		gSize = (gSize - gSizeStep < 1) ? 1 : gSize - gSizeStep;
-		updateSizes();
-		break;
-	case('t') : // Size Up
-		gSize += gSizeStep;
-		updateSizes();
-		break;
 	case(' ') : // Finish Polygon
 		if (currentVertices.size() >= 3) {
 			drawable.push_back(currentVertices);
@@ -256,11 +242,30 @@ void keyboard(unsigned char btn, int x, int y)
 			clickedTimes = 0;
 		}
 		break;
-	case('h') : // Show Help
-		gHelpMenu = !gHelpMenu;
+	case('+') : // Speed Up
+		gSpeed += gSpeedStep;
 		break;
-	case('q') : // Exit
-		exit(0);
+	case('-') : // Speed Down
+		gSpeed = (gSpeed - gSpeedStep < 0) ? 0.005 : gSpeed - gSpeedStep; // no negative speeds
+		break;
+	case('t') : // Size Up
+		gSize += gSizeStep;
+		updateSizes();
+		break;
+	case('g') : // Size Down
+		gSize = (gSize - gSizeStep < 1) ? 1 : gSize - gSizeStep;
+		updateSizes();
+		break;
+	case('p') : // Pause scene
+		gSpeedPause = gPaused ? gSpeedPause : gSpeed;
+		gSpeed = gPaused ? gSpeedPause : 0;
+		gPaused = !gPaused;
+		break;
+	case('r') : // Reset scene
+		drawable.clear();
+		break;
+	case('a') : // Randomize scene
+		randomizeScene();
 		break;
 	case('f') :
 		if (gfullscreen) {
@@ -273,7 +278,14 @@ void keyboard(unsigned char btn, int x, int y)
 			gfullscreen = true;
 		}
 		break;
+	case('m') : // Drag direction mode
+		gDragMode = !gDragMode;
+		break;
+	case('q') : // Exit
+		exit(0);
+		break;
 	}
+
 }
 
 void reshape(int w, int h)
@@ -283,8 +295,10 @@ void reshape(int w, int h)
 
 	glViewport(0, 0, w, h);
 	glMatrixMode(GL_PROJECTION);
+	//glPushMatrix();
 	glLoadIdentity();
 	gluOrtho2D(0, glutGet(GLUT_WINDOW_WIDTH) - 1, glutGet(GLUT_WINDOW_HEIGHT) - 1, 0);
+	//glPopMatrix();
 	glMatrixMode(GL_MODELVIEW);
 	//glLoadIdentity();
 }
@@ -313,8 +327,9 @@ void display(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT);
 	drawDrawable();
-	if (gHelpMenu) drawHelpWindow();
+	if (gHelpMenu) drawHelpText(gWidth / 4, gHeight / 4);
 	//glFlush();
+	drawDirectionArrow();
 	glutSwapBuffers(); // double buffer
 }
 
@@ -322,49 +337,36 @@ int main(int argc, char** argv)
 {
 	std::string line;
 	std::ifstream helpfile("help.txt");
+
 	if (helpfile.is_open())	{
-		while (getline(helpfile, line))
-		{
-			std::cout << line << "\n";
+		while (getline(helpfile, line)) {
+			std::cout << line << "\n"; // Write to console
+			helpText.push_back(line); // Save text for later as well
 		}
 	}
 	else {
 		std::cout << "help.txt missing!";
+		helpText.push_back("help.txt missing!");
 	}
 	helpfile.close();
 
+	#ifdef WIN32
+		system("PAUSE"); // "Press any key to continue"
+	#endif // WIN32
 
-	/*
-	printf("List of commands:\n");
-	printf("%8s %25s\n", "Key", "Function");
-	printf("-------------------------------------\n");
-	printf("%8s %25s\n", "1", "Dot Mode");
-	printf("%8s %25s\n", "2", "Line Mode");
-	printf("%8s %25s\n", "3", "Polygon Mode");
-	printf("%8s %25s\n", "<space>", "Finish Polygon");
-	printf("%8s %25s\n", "+", "Increase speed");
-	printf("%8s %25s\n", "-", "Decrease speed");
-	printf("%8s %25s\n", "y", "Increase vertex size");
-	printf("%8s %25s\n", "h", "Decrease vertex size");
-	printf("%8s %25s\n", "r", "Reset scene");
-	printf("%8s %25s\n", "a", "Randomize scene");
-	printf("%8s %25s\n", "f", "Toggle fullscreen");
-	*/
-	//system("PAUSE");
+	srand(time(NULL));
 
-	glutInit(&argc, argv);		  //starts up GLUT
+	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
-	//glutInitWindowSize(600, 600);
-	glutCreateWindow("Screensaver");	 //creates the window
-
+	glutCreateWindow("Interactive Screensaver");
 	glutFullScreen();
-	//gluOrtho2D(0, glutGet(GLUT_WINDOW_WIDTH), glutGet(GLUT_WINDOW_HEIGHT), 0);
-	
+
 	init();
 	glutDisplayFunc(display);
 	glutReshapeFunc(reshape);
 	glutKeyboardFunc(keyboard);
 	glutMouseFunc(mouse);
+	glutPassiveMotionFunc(mousePassive); // for direction arrows
 	glutTimerFunc(16, timer, 0);
 
 	glutCreateMenu(menu);

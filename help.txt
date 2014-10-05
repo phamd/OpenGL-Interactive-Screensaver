@@ -9,7 +9,11 @@
    -     | Decrease speed 
    t     | Increase vertex size 
    g     | Decrease vertex size 
+   p     | Pause scene
    r     | Reset scene 
    a     | Randomize scene 
    f     | Toggle fullscreen
+   m     | Drag directions mode
    q     | Quit program
+   LMB   | Make vertices
+   RMB   | Open menu

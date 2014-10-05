@@ -5,8 +5,8 @@
 
 float randFloat(float s, float t);
 
+Vector2d pointSlope(Vector2d s, Vector2d f);
 Vector2d pointSlope(float sx, float sy, float fx, float fy);
-
 
 Vector3d randomColor(void);
 
