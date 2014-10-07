@@ -86,7 +86,6 @@
   <ItemGroup>
     <ClInclude Include="calculations.h" />
     <ClInclude Include="containers.h" />
-    <ClInclude Include="main.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="help.txt" />

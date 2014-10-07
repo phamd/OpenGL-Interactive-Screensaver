@@ -1,26 +1,32 @@
-#ifdef WIN32
-#include <windows.h>
-#include <GL/freeglut.h>
+#ifdef _WIN32
+#   include <windows.h> // not needed explicitly
 #endif
-#include <GL/gl.h>
-#include <GL/glu.h>
-#include <GL/glut.h>
+#ifdef __APPLE__
+#   include <GLUT/glut.h>
+#   include <OpenGL/gl.h>
+#   include <OpenGL/glu.h>
+#else
+#   include <GL/glut.h>
+#   include <GL/gl.h> // not needed explicitly
+//#   include <GL/freeglut.h>
+#endif
 #include <vector>
 #include <math.h>
-#include "containers.h"
-#include "calculations.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h> // for random seed
+#include <time.h>
 #include <string>
 #include <cstring>
 #include <iostream>
 #include <fstream>
+#include "containers.h"
+#include "calculations.h"
 
 // Constants
 const float gSizeStep = 1;
-const float gSpeedStep = 0.05;
+const float gSpeedStep = 0.05f;
 enum Modes {Dot, Line, Poly};
+enum Colours { RED, GREEN, BLUE, YELLOW, MAGENTA, TEAL, ORANGE, PINK, PURPLE, WHITE, RANDOMCOLOUR };
 // States
 Modes mouseMode = Dot;
 bool gPaused = false;
@@ -28,13 +34,14 @@ bool gfullscreen = true;
 bool gHelpMenu = true;
 bool gDragMode = false; // Drag to set direction instead of clicking
 float gSize = 3;
-float gSpeed = 0.205;
-float gSpeedPause = 0.01; // Speed to return to after pausing
+float gSpeed = 0.205f;
+float gSpeedPause; // Speed to return to after pausing
 int clickedTimes = 0;
 int gWidth = 600;
 int gHeight = 600;
 int gTime = 0;
 Vector2d gMousePos;
+Vector3d gColour = Vector3d(-1, -1, -1); 
 // Containers
 std::vector<Drawable> drawable;
 std::vector<Drawable>::iterator i;
@@ -75,7 +82,7 @@ void drawDrawable(void)
 void makeVertex(void) {
 	currentVertex.position = Vector2d(randFloat(0, gWidth), randFloat(0, gHeight));
 	currentVertex.direction = Vector2d(randFloat(-1, 1), randFloat(-1, 1));
-	currentVertex.color = randomColor();
+	currentVertex.color = getColour(gColour);
 	currentVertices.push_back(currentVertex);
 }
 
@@ -88,17 +95,15 @@ void clearCurrent(void)
 
 void randomizeScene(void)
 {
-	for (int i = 0; i < (int) randFloat(50,100); i++) { // 50 to 100 objects
-		
+	for (int i = 0; i < (int) randFloat(50,100); i++) { // 50 to 100 objects	
 		float decideShape = randFloat(0, 1);
-			
 		if (decideShape < 0.7) { // 70% point
 			makeVertex();
 			drawable.push_back(currentVertices);
 			drawable.back().type = GL_POINTS;
 			clearCurrent();
 		}
-		else if (decideShape > 0.95) { // 5% polygon
+		else if (decideShape > 0.9) { // 10% polygon
 			for (int i = 0; i < (int)randFloat(3, 7); i++) { // 3 to 7 vertices in a polygon
 				makeVertex();
 			}
@@ -106,7 +111,7 @@ void randomizeScene(void)
 			drawable.back().type = GL_POLYGON;
 			clearCurrent();
 		}
-		else { // 25% line
+		else { // 20% line
 			makeVertex();
 			makeVertex();
 			drawable.push_back(currentVertices);
@@ -118,6 +123,7 @@ void randomizeScene(void)
 
 void drawSentence(const char* line, float startX, float startY)
 {
+	glRasterPos2f(startX, startY);
 	glColor3f(1.0f, 1.0f, 1.0f);
 	for (size_t i = 0; i < std::strlen(line); ++i) {
 		glutBitmapCharacter(GLUT_BITMAP_9_BY_15, line[i]);
@@ -134,33 +140,57 @@ void drawDebugText(void)
 	debugText[4] = "Size: " + std::to_string(gSize);
 
 	for (int i = 0, Y = 20; i < 5; i++, Y += 20) {
-		glRasterPos2f(10, Y);
 		drawSentence(debugText[i].c_str(), 10, Y);
 	}
 }
 
 void drawHelpText(float startX, float startY)
 {
-	for (std::vector<std::string>::iterator li = helpText.begin(); li != helpText.end(); li++) {
-		glRasterPos2f(startX, startY);
+	for (std::vector<std::string>::iterator li = helpText.begin(); li != helpText.end(); li++, startY+=20) {
 		const char *tmp = li->c_str();
 		drawSentence(tmp, startX, startY);
-		startY += 20;
 	}
 	drawDebugText();
 }
 
+void drawDirectionArrow(void)
+{
+	if (clickedTimes % 2 == 1) {
+		float X = gMousePos.x;
+		float Y = gMousePos.y;
+		Vector2d arrowheadPos = pointSlope(gMousePos, currentVertex.position);
+		float k = 1 / (X - arrowheadPos.x);
+		Vector2d thirdPoint = Vector2d(arrowheadPos.x - k, arrowheadPos.x + k);
+
+		glColor3f(currentVertex.color.x, currentVertex.color.y, currentVertex.color.z);
+		glBegin(GL_LINES); // Arrow line
+			glVertex2f((GLfloat)currentVertex.position.x, (GLfloat)currentVertex.position.y);
+			glVertex2f(X, Y);
+		glEnd();
+		glBegin(GL_POLYGON); // Arrow head
+			glVertex2f(X, Y);
+			glVertex2f(X - 20 * thirdPoint.x, Y - 20 * thirdPoint.y);
+			glVertex2f(X - 40 * arrowheadPos.x, Y - 40 * arrowheadPos.y);
+			glVertex2f(X + 20 * thirdPoint.x, Y + 20 * thirdPoint.y);
+		glEnd();
+		glFlush();
+	}
+}
+
+void mousePassive(int x, int y)
+{
+	gMousePos.x = x;
+	gMousePos.y = y;
+}
 
 void mouse(int btn, int state, int x, int y)
 {
-	printf("Pressed %d, %d\n", btn, state);
 	switch (btn) {
 	case(GLUT_LEFT_BUTTON) :
-		printf("%d %d \n", x, y);
 		Vector2d clickedXY = Vector2d((float)x, (float)y);
 		if ((clickedTimes == 0 || clickedTimes % 2 == 0) && state == (gDragMode ? GLUT_DOWN : GLUT_UP)) { // first click
 			currentVertex.position = clickedXY;
-			currentVertex.color = randomColor(); //color
+			currentVertex.color = getColour(gColour);
 			clickedTimes++;
 		}
 		else if ((clickedTimes % 2 == 1) && state == GLUT_UP) { // second click
@@ -183,36 +213,6 @@ void mouse(int btn, int state, int x, int y)
 			clearCurrent();
 		} 
 		break;
-	}
-}
-
-void mousePassive(int x, int y)
-{
-	gMousePos.x = x;
-	gMousePos.y = y;
-}
-
-void drawDirectionArrow()
-{
-	int X = gMousePos.x;
-	int Y = gMousePos.y;
-	Vector2d arrowheadPos = pointSlope(gMousePos, currentVertex.position);
-	float k = (-(X - arrowheadPos.x)) / ((X - arrowheadPos.x)*(X - arrowheadPos.x)); // What am I even doing here?
-	Vector2d thirdPoint = Vector2d(arrowheadPos.x - k, arrowheadPos.x + k);
-
-	if (clickedTimes % 2 == 1) {
-		glBegin(GL_LINES); // Arrow line
-			glColor3f(currentVertex.color.x, currentVertex.color.y, currentVertex.color.z);
-			glVertex2f((GLfloat)currentVertex.position.x, (GLfloat)currentVertex.position.y);
-			glVertex2f(X, Y);
-		glEnd();
-		glBegin(GL_POLYGON); // Arrow head
-			glVertex2f(X, Y);
-			glVertex2f(X - 20 * thirdPoint.x, Y - 20 * thirdPoint.y);
-			glVertex2f(X-40*arrowheadPos.x, Y-40*arrowheadPos.y);
-			glVertex2f(X+20*thirdPoint.x, Y+20*thirdPoint.y);
-		glEnd();
-
 	}
 }
 
@@ -242,11 +242,12 @@ void keyboard(unsigned char btn, int x, int y)
 			clickedTimes = 0;
 		}
 		break;
+	case('=') :
 	case('+') : // Speed Up
-		gSpeed += gSpeedStep;
+		gSpeed += !gPaused ? gSpeedStep : 0;
 		break;
 	case('-') : // Speed Down
-		gSpeed = (gSpeed - gSpeedStep < 0) ? 0.005 : gSpeed - gSpeedStep; // no negative speeds
+		gSpeed = !gPaused ? (gSpeed - gSpeedStep < 0) ? 0.005f : gSpeed - gSpeedStep : gSpeed; // no negative speeds
 		break;
 	case('t') : // Size Up
 		gSize += gSizeStep;
@@ -285,7 +286,6 @@ void keyboard(unsigned char btn, int x, int y)
 		exit(0);
 		break;
 	}
-
 }
 
 void reshape(int w, int h)
@@ -311,6 +311,46 @@ void menu(int label) {
 	}
 }
 
+void colourMenu(int colour)
+{
+	switch (colour) {
+	case (RED) :
+		gColour = Vector3d(1, 0, 0);
+		break;
+	case (GREEN) :
+		gColour = Vector3d(0, 0.5f, 0);
+		break;
+	case (BLUE) :
+		gColour = Vector3d(0, 0, 1);
+		break;
+	case (YELLOW) :
+		gColour = Vector3d(1, 1, 0);
+		break;
+	case (MAGENTA) :
+		gColour = Vector3d(1, 0, 1);
+		break;
+	case (TEAL) :
+		gColour = Vector3d(0, 0.5f, 0.5f);
+		break;
+	case (ORANGE) :
+		gColour = Vector3d(1, 0.2706f, 0);
+		break;
+	case (PINK) :
+		gColour = Vector3d(1, 0.4118f, 0.7059f);
+		break;
+	case (PURPLE) :
+		gColour = Vector3d(0.5f, 0, 0.5f);
+		break;
+	case (WHITE) :
+		gColour = Vector3d(1, 1, 1);
+		break;
+	case (RANDOMCOLOUR) :
+	default :
+		gColour = Vector3d(-1, -1, -1);
+		break;
+	}
+}
+
 void timer(int value)
 {
 	glutPostRedisplay();
@@ -327,7 +367,7 @@ void display(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT);
 	drawDrawable();
-	if (gHelpMenu) drawHelpText(gWidth / 4, gHeight / 4);
+	if (gHelpMenu) drawHelpText(gWidth / 8, gHeight / 4);
 	//glFlush();
 	drawDirectionArrow();
 	glutSwapBuffers(); // double buffer
@@ -350,7 +390,7 @@ int main(int argc, char** argv)
 	}
 	helpfile.close();
 
-	#ifdef WIN32
+	#ifdef _WIN32
 		system("PAUSE"); // "Press any key to continue"
 	#endif // WIN32
 
@@ -366,17 +406,28 @@ int main(int argc, char** argv)
 	glutReshapeFunc(reshape);
 	glutKeyboardFunc(keyboard);
 	glutMouseFunc(mouse);
-	glutPassiveMotionFunc(mousePassive); // for direction arrows
+	glutPassiveMotionFunc(mousePassive); // for clicking direction arrows
+	glutMotionFunc(mousePassive); // for drag mode to draw arrows
 	glutTimerFunc(16, timer, 0);
+
+	int colourSubMenu = glutCreateMenu(colourMenu);
+	glutAddMenuEntry("Random", RANDOMCOLOUR);
+	glutAddMenuEntry("Red", RED);
+	glutAddMenuEntry("Green", GREEN);
+	glutAddMenuEntry("Blue", BLUE);
+	glutAddMenuEntry("Yellow", YELLOW);
+	glutAddMenuEntry("Magenta", MAGENTA);
+	glutAddMenuEntry("Teal", TEAL);
+	glutAddMenuEntry("Orange", ORANGE);
+	glutAddMenuEntry("Pink", PINK);
+	glutAddMenuEntry("Purple", PURPLE);
+	glutAddMenuEntry("White", WHITE);
 
 	glutCreateMenu(menu);
 	glutAddMenuEntry("Quit", 'q');
+	glutAddSubMenu("Set Colour", colourSubMenu);
 	glutAttachMenu(GLUT_RIGHT_BUTTON);
 
 	glutMainLoop();
 	return(0);
 }
-
-
-
-

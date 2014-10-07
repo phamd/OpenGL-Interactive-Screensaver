@@ -36,7 +36,7 @@ class Drawable
 {
 public:
 	std::vector<Vertex> vertices;
-	int type; 
+	unsigned int type; 
 	Drawable(Vertex);
 	Drawable(std::vector<Vertex>);
 	Drawable();

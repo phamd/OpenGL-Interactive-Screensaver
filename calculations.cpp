@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <time.h>
+
 float randFloat(float s, float t) {
 	return s + (t - s) * ((float)rand()) / (float)RAND_MAX;
 }
@@ -23,7 +24,16 @@ Vector2d pointSlope(float sx, float sy, float fx, float fy)
 	return Vector2d(returnX, returnY);
 }
 
-Vector3d randomColor(void)
+Vector3d randomColour(void)
 {
 	return Vector3d((float)rand() / float(RAND_MAX), (float)rand() / float(RAND_MAX), (float)rand() / float(RAND_MAX));
 }
+
+Vector3d getColour(Vector3d colour)
+{
+	if (colour.x == -1)
+		return randomColour();
+	else
+		return colour;
+}
+
