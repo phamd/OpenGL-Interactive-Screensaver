@@ -13,7 +13,17 @@
    r     | Reset scene 
    a     | Randomize scene 
    f     | Toggle fullscreen
-   m     | Drag directions mode
+   m     | Drag instead of clicking twice
+   b     | Blow up a random shape
    q     | Quit program
    LMB   | Make vertices
-   RMB   | Open menu
+   RMB   | Open colour menu
+
+Clicking with the mouse will start building a
+shape. The first click makes a point; the second
+sets the direction. Toggling `m' will let you
+click&drag to quickly make points.
+Switching modes while in the middle of building a shape
+will make the new shape with those points instead.
+For fun: add many random shapes, increase vertex speed
+and size, then hold b.

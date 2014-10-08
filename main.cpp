@@ -30,7 +30,7 @@ enum Colours { RED, GREEN, BLUE, YELLOW, MAGENTA, TEAL, ORANGE, PINK, PURPLE, WH
 // States
 Modes mouseMode = Dot;
 bool gPaused = false;
-bool gfullscreen = true;
+bool gfullscreen = false;
 bool gHelpMenu = true;
 bool gDragMode = false; // Drag to set direction instead of clicking
 float gSize = 3;
@@ -43,54 +43,98 @@ int gTime = 0;
 Vector2d gMousePos;
 Vector3d gColour = Vector3d(-1, -1, -1); 
 // Containers
-std::vector<Drawable> drawable;
-std::vector<Drawable>::iterator i;
+std::vector<Shapes> finishedShapes; // Shapes
+std::vector<Vertex> fireworks; // Explosions
 std::vector<Vertex> currentVertices;
-std::vector<Vertex>::iterator j;
 Vertex currentVertex;
 std::vector<std::string> helpText;
 
-void updateSizes(void)
-{
-	glPointSize(gSize);
-	glLineWidth(gSize);
-}
-
-void drawDrawable(void)
+void drawShapes(void)
 {
 	int elapsedTime = glutGet(GLUT_ELAPSED_TIME);
 	int deltaTime = elapsedTime - gTime;
 	gTime = elapsedTime;
-
-	for (i = drawable.begin(); i != drawable.end(); i++) {
+	
+	// Draw finished shapes
+	for (std::vector<Shapes>::iterator i = finishedShapes.begin(); i != finishedShapes.end(); i++) {
 		glBegin(i->type);
-		for (j = i->vertices.begin(); j != i->vertices.end(); j++) {
-			if (j->position.x < 0) j->direction.x = abs(j->direction.x); // boundry check
-			if (j->position.x > gWidth) j->direction.x = 0 - abs(j->direction.x); // simply flipping the sign wouldn't work
-			if (j->position.y < 0) j->direction.y = abs(j->direction.y);
-			if (j->position.y > gHeight) j->direction.y = 0 - abs(j->direction.y);
+			for (std::vector<Vertex>::iterator j = i->vertices.begin(); j != i->vertices.end(); j++) {
+				if (j->position.x < 0) j->direction.x = abs(j->direction.x); // boundry check
+				if (j->position.x > gWidth) j->direction.x = 0 - abs(j->direction.x);
+				if (j->position.y < 0) j->direction.y = abs(j->direction.y);
+				if (j->position.y > gHeight) j->direction.y = 0 - abs(j->direction.y);
 			
-			j->position.x += j->direction.x * deltaTime * gSpeed;
-			j->position.y += j->direction.y * deltaTime * gSpeed;
-			glColor3f(j->color.x, j->color.y, j->color.z);
-			glVertex2f((GLfloat)j->position.x, (GLfloat)j->position.y);
-		}
+				j->position.x += j->direction.x * deltaTime * gSpeed;
+				j->position.y += j->direction.y * deltaTime * gSpeed;
+				glColor3f(j->colour.x, j->colour.y, j->colour.z);
+				glVertex2f((GLfloat)j->position.x, (GLfloat)j->position.y);
+			}
 		glEnd();
+	}
+
+	// Draw explosions
+	for (std::vector<Vertex>::iterator j = fireworks.begin(); j != fireworks.end(); ) {
+		if (j->position.x < 0 || j->position.x > gWidth || j->position.y < 0 || j-> position.y > gHeight) {
+			j = fireworks.erase(j); // remove point from vector if it leaves the screen
+		}
+		else {
+			j->position.x += j->direction.x * deltaTime * 0.205 * 2;
+			j->position.y += j->direction.y * deltaTime * 0.205 * 2;
+			glColor3f(j->colour.x, j->colour.y, j->colour.z);
+			glBegin(GL_POINTS);
+				glVertex2f((GLfloat)j->position.x, (GLfloat)j->position.y);
+			glEnd();
+			j++;
+		}
+	}
+
+	// Draw unfinished shapes
+	if (currentVertices.size() > 0) {
+		for (std::vector<Vertex>::iterator j = currentVertices.begin(); j != currentVertices.end(); j++) {
+			glBegin(GL_POINTS);
+			glColor3f(j->colour.x, j->colour.y, j->colour.z);
+			glVertex2f((GLfloat)j->position.x, (GLfloat)j->position.y);
+			glEnd();
+		}
 	}
 }
 
-void makeVertex(void) {
-	currentVertex.position = Vector2d(randFloat(0, gWidth), randFloat(0, gHeight));
-	currentVertex.direction = Vector2d(randFloat(-1, 1), randFloat(-1, 1));
-	currentVertex.color = getColour(gColour);
-	currentVertices.push_back(currentVertex);
-}
-
-void clearCurrent(void)
+void clearCurrentVertex(void) // Empty the in progress vertices
 {
-	currentVertices = std::vector<Vertex>(); // empty the in progress vertices
+	currentVertices.clear();
 	currentVertex = Vertex();
 	clickedTimes = 0;
+}
+
+void stickyVertexSwitch(void) // Switch between modes without erasing vertices in progress
+{
+	if (currentVertices.size() > 0) {
+		if (mouseMode == Dot) {
+			for (int i = 0; i < currentVertices.size(); i++) {
+				finishedShapes.push_back(Shapes(currentVertices[i]));
+				finishedShapes.back().type = GL_POINTS;
+			}
+			clearCurrentVertex();
+		}
+		else if (mouseMode == Line) {
+			for (int i = 0, j = 1; j < currentVertices.size(); i+=2, j+=2) {
+				std::vector<Vertex> newLine;
+				newLine.push_back(currentVertices[i]);
+				newLine.push_back(currentVertices[j]);
+				finishedShapes.push_back(Shapes(newLine));
+				finishedShapes.back().type = GL_LINES;
+			}
+			clearCurrentVertex();
+		}
+	}
+}
+
+void makeVertex(void)
+{
+	currentVertex.position = Vector2d(randFloat(0, gWidth), randFloat(0, gHeight));
+	currentVertex.direction = Vector2d(randFloat(-1, 1), randFloat(-1, 1));
+	currentVertex.colour = getColour(gColour);
+	currentVertices.push_back(currentVertex);
 }
 
 void randomizeScene(void)
@@ -99,25 +143,56 @@ void randomizeScene(void)
 		float decideShape = randFloat(0, 1);
 		if (decideShape < 0.7) { // 70% point
 			makeVertex();
-			drawable.push_back(currentVertices);
-			drawable.back().type = GL_POINTS;
-			clearCurrent();
+			finishedShapes.push_back(currentVertices);
+			finishedShapes.back().type = GL_POINTS;
+			clearCurrentVertex();
 		}
 		else if (decideShape > 0.9) { // 10% polygon
 			for (int i = 0; i < (int)randFloat(3, 7); i++) { // 3 to 7 vertices in a polygon
 				makeVertex();
 			}
-			drawable.push_back(currentVertices);
-			drawable.back().type = GL_POLYGON;
-			clearCurrent();
+			finishedShapes.push_back(currentVertices);
+			finishedShapes.back().type = GL_POLYGON;
+			clearCurrentVertex();
 		}
 		else { // 20% line
 			makeVertex();
 			makeVertex();
-			drawable.push_back(currentVertices);
-			drawable.back().type = GL_LINES;
-			clearCurrent();
+			finishedShapes.push_back(currentVertices);
+			finishedShapes.back().type = GL_LINES;
+			clearCurrentVertex();
 		}
+	}
+}
+
+void makeExplosion(Vertex vertex)
+{
+	Vertex fireworkPoint = Vertex();
+	fireworkPoint.position = Vector2d(vertex.position.x, vertex.position.y);
+	fireworkPoint.colour = vertex.colour;
+
+	float x, y;
+	for (x = -1; x <= 1; x += 0.25) {
+		y = sqrt(1 - x*x);
+		fireworkPoint.direction = Vector2d(x, y);
+		fireworks.push_back(fireworkPoint);
+		fireworkPoint.direction = Vector2d(x, -y);
+		fireworks.push_back(fireworkPoint);
+		fireworkPoint.direction = Vector2d(y, x);
+		fireworks.push_back(fireworkPoint);
+		fireworkPoint.direction = Vector2d(-y, x);
+		fireworks.push_back(fireworkPoint);
+	}
+}
+
+void blowUpRandomShape(void)
+{
+	if (finishedShapes.size() > 0) {
+		int index = randFloat(0, finishedShapes.size() - 1);
+		for (std::vector<Vertex>::iterator j = finishedShapes[index].vertices.begin(); j != finishedShapes[index].vertices.end(); j++) {
+			makeExplosion(*j);
+		}
+		finishedShapes.erase(finishedShapes.begin() + index);
 	}
 }
 
@@ -135,7 +210,7 @@ void drawDebugText(void)
 	std::string debugText[5];
 	debugText[0] = "Mouse Mode: " + std::to_string(mouseMode);
 	debugText[1] = "Click count: " + std::to_string(clickedTimes);
-	debugText[2] = "Number of Shapes: " + std::to_string(drawable.size());
+	debugText[2] = "Number of Shapes: " + std::to_string(finishedShapes.size());
 	debugText[3] = "Speed: " + std::to_string(gSpeed);
 	debugText[4] = "Size: " + std::to_string(gSize);
 
@@ -153,28 +228,34 @@ void drawHelpText(float startX, float startY)
 	drawDebugText();
 }
 
-void drawDirectionArrow(void)
+void drawDirectionIndicator(void)
 {
 	if (clickedTimes % 2 == 1) {
 		float X = gMousePos.x;
 		float Y = gMousePos.y;
 		Vector2d arrowheadPos = pointSlope(gMousePos, currentVertex.position);
-		float k = 1 / (X - arrowheadPos.x);
-		Vector2d thirdPoint = Vector2d(arrowheadPos.x - k, arrowheadPos.x + k);
-
-		glColor3f(currentVertex.color.x, currentVertex.color.y, currentVertex.color.z);
+		Vector2d arrowSidePos = Vector2d(arrowheadPos.x - 1 / (X - arrowheadPos.x), arrowheadPos.x + 1 / (X - arrowheadPos.x));
+		glColor3f(currentVertex.colour.x, currentVertex.colour.y, currentVertex.colour.z);
+		glLineWidth(0.5f);
 		glBegin(GL_LINES); // Arrow line
 			glVertex2f((GLfloat)currentVertex.position.x, (GLfloat)currentVertex.position.y);
 			glVertex2f(X, Y);
 		glEnd();
 		glBegin(GL_POLYGON); // Arrow head
-			glVertex2f(X, Y);
-			glVertex2f(X - 20 * thirdPoint.x, Y - 20 * thirdPoint.y);
+			//glVertex2f(X, Y);
+			glVertex2f(X - 20 * arrowSidePos.x, Y - 20 * arrowSidePos.y);
 			glVertex2f(X - 40 * arrowheadPos.x, Y - 40 * arrowheadPos.y);
-			glVertex2f(X + 20 * thirdPoint.x, Y + 20 * thirdPoint.y);
+			glVertex2f(X + 20 * arrowSidePos.x, Y + 20 * arrowSidePos.y);
 		glEnd();
+		glLineWidth(gSize);
 		glFlush();
 	}
+}
+
+void updateSizes(void)
+{
+	glPointSize(gSize);
+	glLineWidth(gSize);
 }
 
 void mousePassive(int x, int y)
@@ -190,7 +271,7 @@ void mouse(int btn, int state, int x, int y)
 		Vector2d clickedXY = Vector2d((float)x, (float)y);
 		if ((clickedTimes == 0 || clickedTimes % 2 == 0) && state == (gDragMode ? GLUT_DOWN : GLUT_UP)) { // first click
 			currentVertex.position = clickedXY;
-			currentVertex.color = getColour(gColour);
+			currentVertex.colour = getColour(gColour);
 			clickedTimes++;
 		}
 		else if ((clickedTimes % 2 == 1) && state == GLUT_UP) { // second click
@@ -199,18 +280,18 @@ void mouse(int btn, int state, int x, int y)
 			clickedTimes++;
 		}
 		if (((clickedTimes == 2 && mouseMode == Dot) || (clickedTimes == 4 && mouseMode == Line)) && state == GLUT_UP) {
-			drawable.push_back(currentVertices);
+			finishedShapes.push_back(currentVertices);
 			switch (mouseMode){
 			case(Dot) :
-				drawable.back().type = GL_POINTS;
+				finishedShapes.back().type = GL_POINTS;
 				break;
 			case(Line) :
-				drawable.back().type = GL_LINES;
+				finishedShapes.back().type = GL_LINES;
 				break;
 			case(Poly) :
 				break;
 			}
-			clearCurrent();
+			clearCurrentVertex();
 		} 
 		break;
 	}
@@ -224,25 +305,24 @@ void keyboard(unsigned char btn, int x, int y)
 		break;
 	case('1') : // Dot Mode
 		mouseMode = Dot;
-		clearCurrent();
+		stickyVertexSwitch();
 		break;
 	case('2') : // Line Mode
 		mouseMode = Line;
-		clearCurrent(); 
+		stickyVertexSwitch();
 		break;
 	case('3') : // Polygon Mode
 		mouseMode = Poly;
-		clearCurrent(); 
+		stickyVertexSwitch();
 		break;
 	case(' ') : // Finish Polygon
 		if (currentVertices.size() >= 3) {
-			drawable.push_back(currentVertices);
-			drawable.back().type = GL_POLYGON;
-			currentVertices = std::vector<Vertex>(); // empty it
-			clickedTimes = 0;
+			finishedShapes.push_back(currentVertices);
+			finishedShapes.back().type = GL_POLYGON;
+			clearCurrentVertex();
 		}
 		break;
-	case('=') :
+	case('=') : // Speed Up alternate button
 	case('+') : // Speed Up
 		gSpeed += !gPaused ? gSpeedStep : 0;
 		break;
@@ -263,15 +343,15 @@ void keyboard(unsigned char btn, int x, int y)
 		gPaused = !gPaused;
 		break;
 	case('r') : // Reset scene
-		drawable.clear();
+		finishedShapes.clear();
+		fireworks.clear();
 		break;
 	case('a') : // Randomize scene
 		randomizeScene();
 		break;
 	case('f') :
 		if (gfullscreen) {
-			glutPositionWindow(0, 0);
-			glutReshapeWindow(600, 600);
+			glutReshapeWindow(600, 720);
 			gfullscreen = false;
 		}
 		else {
@@ -281,6 +361,9 @@ void keyboard(unsigned char btn, int x, int y)
 		break;
 	case('m') : // Drag direction mode
 		gDragMode = !gDragMode;
+		break;
+	case('b') : // Blow up a random shape
+		blowUpRandomShape();
 		break;
 	case('q') : // Exit
 		exit(0);
@@ -295,12 +378,9 @@ void reshape(int w, int h)
 
 	glViewport(0, 0, w, h);
 	glMatrixMode(GL_PROJECTION);
-	//glPushMatrix();
 	glLoadIdentity();
-	gluOrtho2D(0, glutGet(GLUT_WINDOW_WIDTH) - 1, glutGet(GLUT_WINDOW_HEIGHT) - 1, 0);
-	//glPopMatrix();
+	gluOrtho2D(0, w - 1, h - 1, 0);
 	glMatrixMode(GL_MODELVIEW);
-	//glLoadIdentity();
 }
 
 void menu(int label) {
@@ -366,10 +446,9 @@ void init(void)
 void display(void)
 {
 	glClear(GL_COLOR_BUFFER_BIT);
-	drawDrawable();
-	if (gHelpMenu) drawHelpText(gWidth / 8, gHeight / 4);
-	//glFlush();
-	drawDirectionArrow();
+	drawShapes();
+	if (gHelpMenu) drawHelpText(gWidth / 9, gHeight / 5);
+	drawDirectionIndicator();
 	glutSwapBuffers(); // double buffer
 }
 
@@ -392,22 +471,22 @@ int main(int argc, char** argv)
 
 	#ifdef _WIN32
 		system("PAUSE"); // "Press any key to continue"
-	#endif // WIN32
+	#endif
 
 	srand(time(NULL));
 
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
+	glutInitWindowSize(600, 720); // Start Windowed
 	glutCreateWindow("Interactive Screensaver");
-	glutFullScreen();
 
 	init();
 	glutDisplayFunc(display);
 	glutReshapeFunc(reshape);
 	glutKeyboardFunc(keyboard);
 	glutMouseFunc(mouse);
-	glutPassiveMotionFunc(mousePassive); // for clicking direction arrows
-	glutMotionFunc(mousePassive); // for drag mode to draw arrows
+	glutPassiveMotionFunc(mousePassive); // for direction indicators in click mode
+	glutMotionFunc(mousePassive); // for direction indicators in drag mode
 	glutTimerFunc(16, timer, 0);
 
 	int colourSubMenu = glutCreateMenu(colourMenu);
@@ -424,8 +503,8 @@ int main(int argc, char** argv)
 	glutAddMenuEntry("White", WHITE);
 
 	glutCreateMenu(menu);
-	glutAddMenuEntry("Quit", 'q');
 	glutAddSubMenu("Set Colour", colourSubMenu);
+	glutAddMenuEntry("Quit Program", 'q');
 	glutAttachMenu(GLUT_RIGHT_BUTTON);
 
 	glutMainLoop();

@@ -7,7 +7,10 @@ Vector2d::Vector2d(float h, float v)
 	y = v;
 }
 
-Vector2d::Vector2d() {}
+Vector2d::Vector2d()
+{
+	x = y = 1;
+}
 
 Vector3d::Vector3d(float r, float g, float b)
 {
@@ -16,24 +19,31 @@ Vector3d::Vector3d(float r, float g, float b)
 	z = b;
 }
 
-Vector3d::Vector3d() {}
+Vector3d::Vector3d()
+{
+	x = y = z = 1;
+}
 
-Vertex::Vertex(Vector2d pos, Vector2d dir) // insert first element
+Vertex::Vertex(Vector2d pos, Vector2d dir)
 {
 	position = pos;
 	direction = dir;
 }
 
-Vertex::Vertex() {}
+Vertex::Vertex()
+{
+	position = Vector2d(0, 0);
+	direction = Vector2d(0, 0);
+}
 
-Drawable::Drawable(Vertex pos) // insert first element
+Shapes::Shapes(Vertex pos)
 {
 	vertices.push_back(pos);
 }
 
-Drawable::Drawable(std::vector<Vertex> verti) // insert first element
+Shapes::Shapes(std::vector<Vertex> verti)
 {
 	vertices = verti;
 }
 
-Drawable::Drawable() {}
+Shapes::Shapes() {}

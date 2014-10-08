@@ -27,19 +27,19 @@ class Vertex
 public:
 	Vector2d position;
 	Vector2d direction;
-	Vector3d color;
+	Vector3d colour;
 	Vertex(Vector2d, Vector2d);
 	Vertex();
 };
 
-class Drawable 
+class Shapes
 {
 public:
-	std::vector<Vertex> vertices;
-	unsigned int type; 
-	Drawable(Vertex);
-	Drawable(std::vector<Vertex>);
-	Drawable();
+	std::vector<Vertex> vertices; // Shapes are made of vertices
+	unsigned int type; // Three types: Dot, Line, Poly
+	Shapes(Vertex);
+	Shapes(std::vector<Vertex>);
+	Shapes();
 };
 
 #endif
